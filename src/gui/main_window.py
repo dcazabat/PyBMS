@@ -29,6 +29,7 @@ class BMSGeneratorApp:
         self.current_file_path: Optional[str] = None  # Ruta del archivo BMS actual
         self.bms_generator = BMSGenerator()
         self.config = Config()
+        self.should_exit = False  # Control para salir del loop
         
         # Estado de la GUI
         self.selected_field_index: int = -1
@@ -56,7 +57,7 @@ class BMSGeneratorApp:
         # Configuración básica de viewport
         dpg.create_viewport(
             title="PyBMS - BMS Generator",
-            width=1200,
+            width=1500,
             height=800,
             min_width=800,
             min_height=600
@@ -70,10 +71,7 @@ class BMSGeneratorApp:
             # Barra de menú
             with dpg.menu_bar():
                 with dpg.menu(label="Archivo"):
-                    dpg.add_menu_item(label="Nuevo Proyecto", callback=self.new_project)
-                    dpg.add_menu_item(label="Abrir Proyecto", callback=self.open_project)
-                    dpg.add_separator()
-                    dpg.add_menu_item(label="Guardar", callback=self.save_bms)
+                    # Elementos básicos que NO están en botones
                     dpg.add_menu_item(label="Guardar Como...", callback=self.save_bms_as)
                     dpg.add_separator()
                     dpg.add_menu_item(label="Exportar a JSON", callback=self.export_to_json)
@@ -81,38 +79,91 @@ class BMSGeneratorApp:
                     dpg.add_separator()
                     dpg.add_menu_item(label="Salir", callback=self.exit_app)
                     
-                with dpg.menu(label="Editar"):
-                    dpg.add_menu_item(label="Nuevo Mapa", callback=self.new_map)
-                    dpg.add_menu_item(label="Eliminar Mapa", callback=self.delete_map)
-                    dpg.add_separator()
-                    dpg.add_menu_item(label="Nuevo Campo", callback=self.new_field)
-                    dpg.add_menu_item(label="Editar Campo", callback=self.edit_field)
-                    dpg.add_menu_item(label="Eliminar Campo", callback=self.delete_field)
+                # Comentar menú Editar ya que sus funciones están en botones
+                # with dpg.menu(label="Editar"):
+                #     dpg.add_menu_item(label="Nuevo Mapa", callback=self.new_map)  # Ya está en botón
+                #     dpg.add_menu_item(label="Nuevo Campo", callback=self.new_field)  # Ya está en botón
                     
-                with dpg.menu(label="Herramientas"):
-                    dpg.add_menu_item(label="Generar BMS", callback=self.generate_bms)
-                    dpg.add_menu_item(label="Validar Mapa", callback=self.validate_map)
+                # Comentar menú Herramientas ya que sus funciones están en botones  
+                # with dpg.menu(label="Herramientas"):
+                #     dpg.add_menu_item(label="Generar BMS", callback=self.generate_bms)  # Ya está en botón
                     
-                with dpg.menu(label="Vista"):
-                    dpg.add_menu_item(label="Editor Visual", callback=self.show_visual_editor)
-                    dpg.add_menu_item(label="Código BMS", callback=self.show_bms_code)
-                    dpg.add_menu_item(label="Propiedades", callback=self.show_properties)
+                # Comentar el menú Vista ya que las funciones no están implementadas
+                # with dpg.menu(label="Vista"):
+                #     dpg.add_menu_item(label="Editor Visual", callback=self.show_visual_editor)
+                #     dpg.add_menu_item(label="Código BMS", callback=self.show_bms_code)
+                #     dpg.add_menu_item(label="Propiedades", callback=self.show_properties)
                     
                 with dpg.menu(label="Ayuda"):
                     dpg.add_menu_item(label="Acerca de", callback=self.show_about)
             
             # Barra de herramientas
             with dpg.group(horizontal=True):
-                dpg.add_button(label="Nuevo", callback=self.new_project)
-                dpg.add_button(label="Abrir", callback=self.open_project)
-                dpg.add_button(label="Guardar", callback=self.save_bms)
+                # Botones de archivo - azul
+                with dpg.theme() as nuevo_theme:
+                    with dpg.theme_component(dpg.mvButton):
+                        dpg.add_theme_color(dpg.mvThemeCol_Button, (70, 130, 180, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (100, 149, 237, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (30, 90, 140, 255))
+                dpg.add_button(label="[+] Nuevo", callback=self.new_project)
+                dpg.bind_item_theme(dpg.last_item(), nuevo_theme)
+                
+                with dpg.theme() as abrir_theme:
+                    with dpg.theme_component(dpg.mvButton):
+                        dpg.add_theme_color(dpg.mvThemeCol_Button, (70, 130, 180, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (100, 149, 237, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (30, 90, 140, 255))
+                dpg.add_button(label="[O] Abrir", callback=self.open_project)
+                dpg.bind_item_theme(dpg.last_item(), abrir_theme)
+                
+                with dpg.theme() as guardar_theme:
+                    with dpg.theme_component(dpg.mvButton):
+                        dpg.add_theme_color(dpg.mvThemeCol_Button, (34, 139, 34, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (50, 205, 50, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (20, 100, 20, 255))
+                dpg.add_button(label="[S] Guardar", callback=self.save_bms)
+                dpg.bind_item_theme(dpg.last_item(), guardar_theme)
+                
                 dpg.add_separator()
-                dpg.add_button(label="Aplicar Cambios", callback=self.apply_field_changes_with_confirmation)
+                
+                # Botón aplicar cambios - naranja
+                with dpg.theme() as aplicar_theme:
+                    with dpg.theme_component(dpg.mvButton):
+                        dpg.add_theme_color(dpg.mvThemeCol_Button, (255, 140, 0, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (255, 165, 0, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (205, 110, 0, 255))
+                dpg.add_button(label="[*] Aplicar Cambios", callback=self.apply_field_changes_with_confirmation)
+                dpg.bind_item_theme(dpg.last_item(), aplicar_theme)
+                
                 dpg.add_separator()
-                dpg.add_button(label="Nuevo Mapa", callback=self.new_map)
-                dpg.add_button(label="Nuevo Campo", callback=self.new_field)
+                
+                # Botones de creación - púrpura
+                with dpg.theme() as mapa_theme:
+                    with dpg.theme_component(dpg.mvButton):
+                        dpg.add_theme_color(dpg.mvThemeCol_Button, (138, 43, 226, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (160, 70, 255, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (100, 20, 180, 255))
+                dpg.add_button(label="[M] Nuevo Mapa", callback=self.new_map)
+                dpg.bind_item_theme(dpg.last_item(), mapa_theme)
+                
+                with dpg.theme() as campo_theme:
+                    with dpg.theme_component(dpg.mvButton):
+                        dpg.add_theme_color(dpg.mvThemeCol_Button, (138, 43, 226, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (160, 70, 255, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (100, 20, 180, 255))
+                dpg.add_button(label="[F] Nuevo Campo", callback=self.new_field)
+                dpg.bind_item_theme(dpg.last_item(), campo_theme)
+                
                 dpg.add_separator()
-                dpg.add_button(label="Generar BMS", callback=self.generate_bms)
+                
+                # Botón generar - rojo
+                with dpg.theme() as generar_theme:
+                    with dpg.theme_component(dpg.mvButton):
+                        dpg.add_theme_color(dpg.mvThemeCol_Button, (220, 20, 60, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (255, 69, 0, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (178, 34, 34, 255))
+                dpg.add_button(label="[G] Generar BMS", callback=self.generate_bms)
+                dpg.bind_item_theme(dpg.last_item(), generar_theme)
             
             dpg.add_separator()
             
@@ -220,11 +271,32 @@ class BMSGeneratorApp:
             
             # Botones de acción
             with dpg.group(horizontal=True):
-                dpg.add_button(label="Aplicar Cambios", callback=self.apply_field_changes, width=120)
-                dpg.add_button(label="Seleccionar Campo", callback=self.show_field_selector, width=120)
-            
-            dpg.add_text("Campo actual: Ninguno", tag="current_field_label")
+                # Botón aplicar - verde
+                with dpg.theme() as prop_aplicar_theme:
+                    with dpg.theme_component(dpg.mvButton):
+                        dpg.add_theme_color(dpg.mvThemeCol_Button, (34, 139, 34, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (50, 205, 50, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (20, 100, 20, 255))
+                dpg.add_button(label="[*] Aplicar Cambios", callback=self.apply_field_changes, width=140)
+                dpg.bind_item_theme(dpg.last_item(), prop_aplicar_theme)
                 
+                # Botón seleccionar - azul claro
+                with dpg.theme() as prop_select_theme:
+                    with dpg.theme_component(dpg.mvButton):
+                        dpg.add_theme_color(dpg.mvThemeCol_Button, (30, 144, 255, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (70, 170, 255, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (10, 120, 200, 255))
+                dpg.add_button(label="[>] Seleccionar Campo", callback=self.show_field_selector, width=140)
+                dpg.bind_item_theme(dpg.last_item(), prop_select_theme)
+            
+        # Configurar handler para interceptar cierre de ventana
+        with dpg.handler_registry():
+            dpg.add_key_press_handler(dpg.mvKey_F4, callback=self._on_alt_f4)
+                
+    def _on_alt_f4(self):
+        """Intercepta Alt+F4 para mostrar confirmación"""
+        if dpg.is_key_down(dpg.mvKey_ModAlt):
+            self.exit_app()
     def draw_screen_grid(self):
         """Dibuja la cuadrícula de la pantalla 24x80"""
         # Colores
@@ -444,16 +516,31 @@ class BMSGeneratorApp:
             
             # Botones
             with dpg.group(horizontal=True):
+                # Botón cargar forzado - amarillo/naranja (advertencia)
+                with dpg.theme() as warning_theme:
+                    with dpg.theme_component(dpg.mvButton):
+                        dpg.add_theme_color(dpg.mvThemeCol_Button, (255, 193, 7, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (255, 215, 0, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (218, 165, 32, 255))
                 dpg.add_button(
-                    label="Cargar de todos modos",
+                    label="[!] Cargar de todos modos",
                     callback=lambda: self._force_load_as_bms(file_name),
-                    width=130
+                    width=170
                 )
+                dpg.bind_item_theme(dpg.last_item(), warning_theme)
+                
+                # Botón cancelar - rojo
+                with dpg.theme() as cancel_theme:
+                    with dpg.theme_component(dpg.mvButton):
+                        dpg.add_theme_color(dpg.mvThemeCol_Button, (220, 53, 69, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (255, 69, 0, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (178, 34, 34, 255))
                 dpg.add_button(
-                    label="Cancelar",
+                    label="[X] Cancelar",
                     callback=lambda: dpg.delete_item("invalid_bms_alert"),
-                    width=100
+                    width=120
                 )
+                dpg.bind_item_theme(dpg.last_item(), cancel_theme)
     
     def _force_load_as_bms(self, file_path: str):
         """Fuerza la carga de un archivo como BMS aunque no parezca válido"""
@@ -1346,16 +1433,31 @@ class BMSGeneratorApp:
             dpg.add_separator()
             
             with dpg.group(horizontal=True):
+                # Botón confirmar - verde
+                with dpg.theme() as confirm_theme:
+                    with dpg.theme_component(dpg.mvButton):
+                        dpg.add_theme_color(dpg.mvThemeCol_Button, (40, 167, 69, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (50, 205, 50, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (30, 130, 50, 255))
                 dpg.add_button(
-                    label="Sí, Aplicar", 
+                    label="[*] Si, Aplicar", 
                     callback=self._confirm_apply_changes,
-                    width=100
+                    width=120
                 )
+                dpg.bind_item_theme(dpg.last_item(), confirm_theme)
+                
+                # Botón cancelar - rojo
+                with dpg.theme() as modal_cancel_theme:
+                    with dpg.theme_component(dpg.mvButton):
+                        dpg.add_theme_color(dpg.mvThemeCol_Button, (220, 53, 69, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (255, 69, 0, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (178, 34, 34, 255))
                 dpg.add_button(
-                    label="Cancelar", 
+                    label="[X] Cancelar", 
                     callback=lambda: dpg.delete_item("confirm_changes_modal"),
                     width=100
                 )
+                dpg.bind_item_theme(dpg.last_item(), modal_cancel_theme)
                 
     def _confirm_apply_changes(self):
         """Confirma y aplica los cambios al campo"""
@@ -1377,14 +1479,28 @@ class BMSGeneratorApp:
             for i, field in enumerate(self.current_map.fields):
                 # Crear callback específico para cada botón
                 callback_func = self._create_field_select_callback(i)
+                # Botones de campos - azul claro
+                with dpg.theme() as field_select_theme:
+                    with dpg.theme_component(dpg.mvButton):
+                        dpg.add_theme_color(dpg.mvThemeCol_Button, (72, 139, 194, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (100, 149, 237, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (50, 100, 150, 255))
                 dpg.add_button(
-                    label=f"{field.name} (L{field.line}:C{field.column})",
+                    label=f"[F] {field.name} (L{field.line}:C{field.column})",
                     callback=callback_func,
                     width=-1
                 )
+                dpg.bind_item_theme(dpg.last_item(), field_select_theme)
                 
             dpg.add_separator()
-            dpg.add_button(label="Cancelar", callback=lambda: dpg.delete_item("field_selector_window"), width=-1)
+            # Botón cancelar - rojo
+            with dpg.theme() as selector_cancel_theme:
+                with dpg.theme_component(dpg.mvButton):
+                    dpg.add_theme_color(dpg.mvThemeCol_Button, (220, 53, 69, 255))
+                    dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (255, 69, 0, 255))
+                    dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (178, 34, 34, 255))
+            dpg.add_button(label="[X] Cancelar", callback=lambda: dpg.delete_item("field_selector_window"), width=-1)
+            dpg.bind_item_theme(dpg.last_item(), selector_cancel_theme)
             
     def _create_field_select_callback(self, field_index: int):
         """Crea una función callback para seleccionar un campo específico"""
@@ -1425,15 +1541,61 @@ class BMSGeneratorApp:
         else:
             self.update_status(f"Error: índice de campo fuera de rango: {index}")
         
-    # Placeholders para otras funcionalidades
-    def delete_map(self): pass
-    def edit_field(self): pass  
-    def delete_field(self): pass
-    def validate_map(self): pass
-    def show_visual_editor(self): pass
-    def show_bms_code(self): pass
-    def show_properties(self): pass
-    def show_about(self): pass
+    # Placeholders para otras funcionalidades - comentados los no implementados
+    # def delete_map(self): pass  # TODO: Implementar eliminación de mapas
+    # def edit_field(self): pass  # TODO: Implementar edición de campos
+    # def delete_field(self): pass  # TODO: Implementar eliminación de campos  
+    # def validate_map(self): pass  # TODO: Implementar validación de mapas
+    # def show_visual_editor(self): pass  # TODO: Implementar cambio de vista
+    # def show_bms_code(self): pass  # TODO: Implementar cambio de vista
+    # def show_properties(self): pass  # TODO: Implementar cambio de vista
+    
+    def show_about(self):
+        """Muestra el diálogo Acerca de"""
+        if dpg.does_item_exist("about_dialog"):
+            dpg.delete_item("about_dialog")
+            
+        # Calcular posición centrada
+        viewport_width = dpg.get_viewport_width()
+        viewport_height = dpg.get_viewport_height()
+        window_width = 400
+        window_height = 300
+        pos_x = (viewport_width - window_width) // 2
+        pos_y = (viewport_height - window_height) // 2
+            
+        with dpg.window(
+            label="Acerca de PyBMS", 
+            width=window_width, 
+            height=window_height, 
+            modal=True, 
+            tag="about_dialog",
+            pos=[pos_x, pos_y]
+        ):
+            dpg.add_text("PyBMS - Python BMS Generator")
+            dpg.add_separator()
+            dpg.add_text("Versión: 1.0.0")
+            dpg.add_text("")
+            dpg.add_text("Una herramienta completa para generar mapas BMS")
+            dpg.add_text("(Basic Mapping Support) para sistemas mainframe CICS.")
+            dpg.add_text("")
+            dpg.add_text("Características:")
+            dpg.add_text("• Editor visual de mapas BMS")
+            dpg.add_text("• Generación automática de código") 
+            dpg.add_text("• Soporte para campos con atributos")
+            dpg.add_text("• Validación de contenido BMS")
+            dpg.add_text("• Exportación a JSON")
+            dpg.add_text("")
+            dpg.add_text("Desarrollado con Python y DearPyGUI")
+            dpg.add_separator()
+            
+            # Botón cerrar
+            with dpg.theme() as about_close_theme:
+                with dpg.theme_component(dpg.mvButton):
+                    dpg.add_theme_color(dpg.mvThemeCol_Button, (70, 130, 180, 255))
+                    dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (100, 149, 237, 255))
+                    dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (30, 90, 140, 255))
+            dpg.add_button(label="[X] Cerrar", callback=lambda: dpg.delete_item("about_dialog"), width=-1)
+            dpg.bind_item_theme(dpg.last_item(), about_close_theme)
     def import_bms(self):
         """Importa un archivo BMS existente"""
         # Verificar si ya existe un diálogo y eliminarlo
@@ -1521,12 +1683,91 @@ class BMSGeneratorApp:
         except Exception as e:
             self.update_status(f"Error al exportar copia del mapa BMS: {e}")
     def exit_app(self): 
-        dpg.stop_dearpygui()
+        """Muestra confirmación antes de salir de la aplicación"""
+        if dpg.does_item_exist("exit_confirmation_dialog"):
+            dpg.delete_item("exit_confirmation_dialog")
+            
+        # Calcular posición centrada
+        viewport_width = dpg.get_viewport_width()
+        viewport_height = dpg.get_viewport_height()
+        window_width = 350
+        window_height = 150
+        pos_x = (viewport_width - window_width) // 2
+        pos_y = (viewport_height - window_height) // 2
+            
+        with dpg.window(
+            label="Confirmar Salida",
+            width=window_width,
+            height=window_height,
+            modal=True,
+            tag="exit_confirmation_dialog",
+            pos=[pos_x, pos_y]
+        ):
+            dpg.add_text("¿Está seguro de que desea salir de PyBMS?")
+            dpg.add_text("")
+            dpg.add_text("Se perderán los cambios no guardados.")
+            dpg.add_separator()
+            
+            # Centrar los botones horizontalmente
+            dpg.add_spacer(height=5)
+            with dpg.group(horizontal=True):
+                # Espaciador izquierdo para centrar
+                dpg.add_spacer(width=30)
+                
+                # Botón confirmar salida - rojo
+                with dpg.theme() as exit_confirm_theme:
+                    with dpg.theme_component(dpg.mvButton):
+                        dpg.add_theme_color(dpg.mvThemeCol_Button, (220, 53, 69, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (255, 69, 0, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (178, 34, 34, 255))
+                dpg.add_button(
+                    label="[!] Sí, Salir", 
+                    callback=self._confirm_exit,
+                    width=120
+                )
+                dpg.bind_item_theme(dpg.last_item(), exit_confirm_theme)
+                
+                # Espaciador entre botones
+                dpg.add_spacer(width=20)
+                
+                # Botón cancelar - verde (quedarse)
+                with dpg.theme() as exit_cancel_theme:
+                    with dpg.theme_component(dpg.mvButton):
+                        dpg.add_theme_color(dpg.mvThemeCol_Button, (40, 167, 69, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (50, 205, 50, 255))
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (30, 130, 50, 255))
+                dpg.add_button(
+                    label="[X] Cancelar", 
+                    callback=lambda: dpg.delete_item("exit_confirmation_dialog"),
+                    width=120
+                )
+                dpg.bind_item_theme(dpg.last_item(), exit_cancel_theme)
+                
+    def _confirm_exit(self):
+        """Confirma y ejecuta la salida de la aplicación"""
+        dpg.delete_item("exit_confirmation_dialog")
+        self.should_exit = True  # Marcar para permitir salida
+        dpg.stop_dearpygui()  # Forzar cierre de la aplicación
+        
+    def _on_window_close(self):
+        """Callback que se ejecuta cuando se intenta cerrar la ventana"""
+        # Si ya se confirmó la salida, permitir el cierre
+        if self.should_exit:
+            return True
+            
+        # Si no se ha confirmado, mostrar diálogo y prevenir cierre
+        self.exit_app()
+        return False  # Prevenir el cierre hasta que se confirme
         
     def run(self):
         """Ejecuta la aplicación"""
         dpg.setup_dearpygui()
         dpg.show_viewport()
         dpg.set_primary_window("main_window", True)
+        
+        # Configurar callback para interceptar cierre del viewport
+        dpg.set_exit_callback(self._on_window_close)
+        
+        # Usar el método estándar de DearPyGUI
         dpg.start_dearpygui()
         dpg.destroy_context()
