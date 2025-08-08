@@ -250,6 +250,10 @@ class BMSGeneratorApp:
             )
             dpg.add_input_text(label="Valor inicial", tag="field_initial_input")
             
+            # PICIN y PICOUT para campos INPUT/OUTPUT
+            dpg.add_input_text(label="PICIN (entrada)", tag="field_picin_input", hint="Ej: 9(8)")
+            dpg.add_input_text(label="PICOUT (salida)", tag="field_picout_input", hint="Ej: ZZ,ZZ9.99")
+            
             # Color y Hilight
             dpg.add_combo(
                 label="Color",
@@ -931,10 +935,6 @@ class BMSGeneratorApp:
         """Determina el tipo de campo basado en la línea BMS"""
         line_upper = line.upper()
         
-        # Si tiene valor inicial, probablemente es una etiqueta
-        if initial_value:
-            return FieldType.LABEL
-            
         # Si tiene PICIN, es un campo de entrada
         if 'PICIN=' in line_upper:
             return FieldType.INPUT
@@ -943,15 +943,15 @@ class BMSGeneratorApp:
         if 'PICOUT=' in line_upper and 'PICIN=' not in line_upper:
             return FieldType.OUTPUT
             
-        # Si tiene ATTRB=PROT, es protegido
-        if 'ATTRB=PROT' in line_upper or 'ATTRB=(PROT' in line_upper:
-            return FieldType.PROTECTED
+        # Si tiene valor inicial, probablemente es una etiqueta
+        if initial_value:
+            return FieldType.LABEL
             
-        # Si tiene ATTRB=UNPROT, es desprotegido
+        # Si tiene ATTRB=UNPROT o similar, es desprotegido (tipo INPUT por defecto)
         if 'ATTRB=UNPROT' in line_upper or 'ATTRB=(UNPROT' in line_upper:
-            return FieldType.UNPROTECTED
+            return FieldType.INPUT
             
-        # Por defecto
+        # Por defecto, campos sin características especiales son etiquetas
         return FieldType.LABEL
         
     def _extract_attributes(self, line: str) -> list:
@@ -1103,8 +1103,23 @@ class BMSGeneratorApp:
             return
             
         try:
-            # Generar el código BMS
-            bms_code = self.bms_generator.generate_map_code(self.current_map)
+            # Obtener el código BMS directamente del editor
+            if not dpg.does_item_exist("bms_code_text"):
+                self.update_status("Error: Editor de código BMS no disponible")
+                return
+                
+            bms_code = dpg.get_value("bms_code_text")
+            
+            # Verificar que hay contenido válido
+            if not bms_code or bms_code.strip() == "// No hay mapa seleccionado":
+                self.update_status("Error: No hay código BMS válido para guardar")
+                return
+            
+            print(f"=== GUARDANDO CÓDIGO DESDE EDITOR ===")
+            print(f"Primeras líneas del código:")
+            for line in bms_code.split('\n')[:5]:
+                print(f"  {repr(line)}")
+            print("===================================")
             
             # Sobrescribir el archivo original
             with open(self.current_file_path, 'w', encoding='utf-8') as f:
@@ -1157,8 +1172,24 @@ class BMSGeneratorApp:
                 if not any(file_path.endswith(ext) for ext in ['.bms', '.txt']):
                     file_path += '.bms'
                     
-                # Generar el código BMS
-                bms_code = self.bms_generator.generate_map_code(self.current_map)
+                # Obtener el código BMS directamente del editor
+                if not dpg.does_item_exist("bms_code_text"):
+                    self.update_status("Error: Editor de código BMS no disponible")
+                    return
+                    
+                bms_code = dpg.get_value("bms_code_text")
+                
+                # Verificar que hay contenido válido
+                if not bms_code or bms_code.strip() == "// No hay mapa seleccionado":
+                    self.update_status("Error: No hay código BMS válido para guardar")
+                    return
+                
+                print(f"=== GUARDANDO COMO - CÓDIGO DESDE EDITOR ===")
+                print(f"Archivo: {file_path}")
+                print(f"Primeras líneas del código:")
+                for line in bms_code.split('\n')[:5]:
+                    print(f"  {repr(line)}")
+                print("==========================================")
                 
                 # Guardar el archivo BMS
                 with open(file_path, 'w', encoding='utf-8') as f:
@@ -1276,6 +1307,12 @@ class BMSGeneratorApp:
             dpg.set_value("field_type_combo", field.field_type.value)
         if dpg.does_item_exist("field_initial_input"):
             dpg.set_value("field_initial_input", field.initial_value)
+        if dpg.does_item_exist("field_picin_input"):
+            dpg.set_value("field_picin_input", field.picin or "")
+            print(f"Cargando PICIN: '{field.picin}'")
+        if dpg.does_item_exist("field_picout_input"):
+            dpg.set_value("field_picout_input", field.picout or "")
+            print(f"Cargando PICOUT: '{field.picout}'")
         if dpg.does_item_exist("field_color_combo"):
             dpg.set_value("field_color_combo", field.color or "")
         if dpg.does_item_exist("field_hilight_combo"):
@@ -1397,6 +1434,8 @@ class BMSGeneratorApp:
         dpg.set_value("field_length_input", 1)
         dpg.set_value("field_type_combo", "")
         dpg.set_value("field_initial_input", "")
+        dpg.set_value("field_picin_input", "")
+        dpg.set_value("field_picout_input", "")
         dpg.set_value("field_color_combo", "")
         dpg.set_value("field_hilight_combo", "")
         
@@ -1423,15 +1462,26 @@ class BMSGeneratorApp:
             return
             
         try:
-            # Obtener valores del panel
+            # Obtener valores del panel con verificaciones de seguridad
             name = dpg.get_value("field_name_input")
             line = dpg.get_value("field_line_input")
             column = dpg.get_value("field_column_input")
             length = dpg.get_value("field_length_input")
             field_type = dpg.get_value("field_type_combo")
             initial_value = dpg.get_value("field_initial_input")
+            
+            # Obtener PICIN y PICOUT con verificaciones
+            picin = ""
+            picout = ""
+            if dpg.does_item_exist("field_picin_input"):
+                picin = dpg.get_value("field_picin_input")
+            if dpg.does_item_exist("field_picout_input"):
+                picout = dpg.get_value("field_picout_input")
+                
             color = dpg.get_value("field_color_combo")
             hilight = dpg.get_value("field_hilight_combo")
+            
+            print(f"Aplicando cambios - PICIN: '{picin}', PICOUT: '{picout}'")
             
             # Actualizar el campo
             self.selected_field.name = name
@@ -1439,8 +1489,12 @@ class BMSGeneratorApp:
             self.selected_field.column = column
             self.selected_field.length = length
             self.selected_field.initial_value = initial_value
+            self.selected_field.picin = picin if picin.strip() else None
+            self.selected_field.picout = picout if picout.strip() else None
             self.selected_field.color = color if color else None
             self.selected_field.hilight = hilight if hilight else None
+            
+            print(f"Campo actualizado - PICIN: {self.selected_field.picin}, PICOUT: {self.selected_field.picout}")
             
             # Actualizar tipo de campo
             for ft in FieldType:
@@ -1448,16 +1502,60 @@ class BMSGeneratorApp:
                     self.selected_field.field_type = ft
                     break
                     
-            # Actualizar atributos
+            # Actualizar atributos - LIMPIAR PRIMERO
+            old_attributes = [attr.value for attr in self.selected_field.attributes]
             self.selected_field.attributes.clear()
+            
+            # Aplicar solo los atributos marcados actualmente
+            new_attributes = []
             for attr in FieldAttribute:
-                if dpg.get_value(f"attr_{attr.value}"):
+                attr_id = f"attr_{attr.value}"
+                if dpg.does_item_exist(attr_id) and dpg.get_value(attr_id):
                     self.selected_field.attributes.append(attr)
+                    new_attributes.append(attr.value)
+            
+            # Lógica especial para campos INPUT: agregar UNPROT automáticamente si no tiene otros atributos de protección
+            if self.selected_field.field_type == FieldType.INPUT:
+                has_protection_attr = any(attr in [FieldAttribute.PROT, FieldAttribute.UNPROT] for attr in self.selected_field.attributes)
+                if not has_protection_attr:
+                    # Asegurarse de que UNPROT esté marcado en la UI
+                    if dpg.does_item_exist("attr_UNPROT"):
+                        dpg.set_value("attr_UNPROT", True)
+                    self.selected_field.attributes.append(FieldAttribute.UNPROT)
+                    new_attributes.append("UNPROT")
+            
+            print(f"Atributos cambiados: {old_attributes} -> {new_attributes}")
+            print(f"Tipo de campo: {self.selected_field.field_type.value}")
                     
             # Actualizar visualización
             self.update_visual_editor()
             self.update_bms_code_display()
             self.update_project_tree()
+            
+            # Debug: Verificar código BMS generado
+            if self.current_map:
+                try:
+                    bms_code = self.bms_generator.generate_map_code(self.current_map)
+                    print("=== CÓDIGO BMS ACTUALIZADO ===")
+                    # Buscar líneas que contengan el nombre del campo actual
+                    lines = bms_code.split('\n')
+                    found_field = False
+                    for i, line in enumerate(lines):
+                        if name.upper() in line:
+                            print(f"Línea del campo {name}:")
+                            print(repr(line))  # Mostrar caracteres especiales
+                            # Si hay línea de continuación, mostrarla también
+                            if line.strip().endswith('*') and i + 1 < len(lines):
+                                print("Línea de continuación:")
+                                print(repr(lines[i + 1]))
+                            found_field = True
+                            break
+                    if not found_field:
+                        print(f"No se encontró el campo {name} en el código generado")
+                    print("=============================")
+                except Exception as e:
+                    print(f"Error al generar código BMS para debug: {e}")
+            
             self.update_status(f"Cambios aplicados al campo: {name}")
             
         except Exception as e:

@@ -112,10 +112,12 @@ class BMSGenerator:
             escaped_value = field.initial_value.replace("'", "''")
             initial_str = f",INITIAL='{escaped_value}'"
             
-        # Picture
+        # Picture (PICIN y PICOUT)
         picture_str = ""
-        if field.picture:
-            picture_str = f",PICIN='{field.picture}'"
+        if field.picin:
+            picture_str += f",PICIN='{field.picin}'"
+        if field.picout:
+            picture_str += f",PICOUT='{field.picout}'"
             
         # Color
         color_str = ""
@@ -141,8 +143,10 @@ class BMSGenerator:
             continuation_parts = []
             if field.attributes:
                 continuation_parts.append(attributes_str.lstrip(','))
-            if field.picture:
-                continuation_parts.append(picture_str.lstrip(','))
+            if field.picin:
+                continuation_parts.append(f"PICIN='{field.picin}'")
+            if field.picout:
+                continuation_parts.append(f"PICOUT='{field.picout}'")
             if field.color:
                 continuation_parts.append(color_str.lstrip(','))
             if field.hilight:

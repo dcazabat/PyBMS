@@ -12,7 +12,6 @@ class FieldType(Enum):
     LABEL = "LABEL"
     INPUT = "INPUT"  
     OUTPUT = "OUTPUT"
-    PROTECTED = "PROTECTED"
     NUMERIC = "NUMERIC"
     UNPROTECTED = "UNPROTECTED"
 
@@ -40,7 +39,9 @@ class BMSField:
     field_type: FieldType = FieldType.UNPROTECTED
     attributes: List[FieldAttribute] = field(default_factory=list)
     initial_value: str = ""
-    picture: Optional[str] = None
+    picture: Optional[str] = None  # Para compatibilidad hacia atrás
+    picin: Optional[str] = None    # PICIN para campos de entrada
+    picout: Optional[str] = None   # PICOUT para campos de salida
     justify: str = "LEFT"  # LEFT, RIGHT, CENTER
     color: Optional[str] = None  # COLOR=RED, COLOR=BLUE, etc.
     hilight: Optional[str] = None  # HILIGHT=UNDERLINE, HILIGHT=BLINK, etc.
@@ -51,9 +52,24 @@ class BMSField:
         attr_str = f"ATTRB=({attrs})" if attrs else ""
         
         initial_str = f",INITIAL='{self.initial_value}'" if self.initial_value else ""
-        picture_str = f",PICIN='{self.picture}'" if self.picture else ""
         
-        return f"{self.name} DFHMDF POS=({self.line},{self.column}),LENGTH={self.length}{attr_str}{initial_str}{picture_str}"
+        # Manejar PICIN y PICOUT
+        picture_parts = []
+        if self.picin:
+            picture_parts.append(f"PICIN='{self.picin}'")
+        elif self.picture:  # Compatibilidad hacia atrás
+            picture_parts.append(f"PICIN='{self.picture}'")
+            
+        if self.picout:
+            picture_parts.append(f"PICOUT='{self.picout}'")
+            
+        picture_str = f",{','.join(picture_parts)}" if picture_parts else ""
+        
+        # Agregar color y highlight si están definidos
+        color_str = f",COLOR={self.color}" if self.color else ""
+        hilight_str = f",HILIGHT={self.hilight}" if self.hilight else ""
+        
+        return f"{self.name} DFHMDF POS=({self.line},{self.column}),LENGTH={self.length}{attr_str}{initial_str}{picture_str}{color_str}{hilight_str}"
 
 
 @dataclass  
