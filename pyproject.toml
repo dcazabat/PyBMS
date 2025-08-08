@@ -1,0 +1,21 @@
+# Configuración para VS Code Python
+[tool.pylsp-mypy]
+enabled = true
+strict = false
+
+[tool.mypy]
+python_version = "3.8"
+mypath = ["src"]
+namespace_packages = true
+explicit_package_bases = true
+
+# Ignorar errores de import para desarrollo
+[[tool.mypy.overrides]]
+module = [
+    "models",
+    "bms", 
+    "gui",
+    "utils"
+]
+ignore_missing_imports = true
+ignore_errors = true
