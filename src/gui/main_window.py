@@ -574,11 +574,14 @@ class BMSGeneratorApp:
             self.current_file_path = file_path
             
             # Crear un nuevo proyecto para el archivo BMS
-            project_name = Path(file_path).stem
+            # Usar el nombre del archivo sin extensión, pero validar que sea un nombre válido
+            file_name = Path(file_path).stem
+            project_name = file_name if file_name else "PROYECTO_BMS"
             self.current_project = BMSProject(name=project_name)
             
             # Crear un mapa basado en el archivo BMS
-            map_name = project_name.upper()
+            # Usar el nombre del archivo como base, asegurando que sea válido para COBOL
+            map_name = self._sanitize_name_for_cobol(file_name) if file_name else "MAPA01"
             new_map = BMSMap(name=map_name, mapset_name="MAPSET01")
             
             # Parsear el contenido BMS básico
@@ -602,6 +605,28 @@ class BMSGeneratorApp:
             
         except Exception as e:
             raise Exception(f"Error al procesar archivo BMS: {e}")
+            
+    def _sanitize_name_for_cobol(self, name: str) -> str:
+        """Convierte un nombre de archivo a un nombre válido para COBOL/BMS"""
+        # Convertir a mayúsculas
+        clean_name = name.upper()
+        
+        # Reemplazar caracteres no válidos con guiones bajos
+        import re
+        clean_name = re.sub(r'[^A-Z0-9]', '_', clean_name)
+        
+        # Asegurar que empiece con letra
+        if clean_name and not clean_name[0].isalpha():
+            clean_name = 'M' + clean_name
+            
+        # Limitar longitud (máximo 8 caracteres para BMS)
+        clean_name = clean_name[:8]
+        
+        # Si queda vacío, usar nombre por defecto
+        if not clean_name:
+            clean_name = "MAPA01"
+            
+        return clean_name
             
     def _load_json_project(self, file_path: str):
         """Carga un proyecto desde un archivo JSON"""
@@ -1222,31 +1247,52 @@ class BMSGeneratorApp:
     def update_map_properties(self):
         """Actualiza las propiedades del mapa en el panel"""
         if self.current_map:
-            dpg.set_value("map_name_input", self.current_map.name)
-            dpg.set_value("mapset_name_input", self.current_map.mapset_name)
-            dpg.set_value("map_mode_combo", self.current_map.mode)
-            dpg.set_value("map_lang_combo", self.current_map.lang)
+            # Verificar que los elementos existen antes de establecer valores
+            if dpg.does_item_exist("map_name_input"):
+                dpg.set_value("map_name_input", self.current_map.name)
+            if dpg.does_item_exist("mapset_name_input"):
+                dpg.set_value("mapset_name_input", self.current_map.mapset_name)
+            if dpg.does_item_exist("map_mode_combo"):
+                dpg.set_value("map_mode_combo", self.current_map.mode)
+            if dpg.does_item_exist("map_lang_combo"):
+                dpg.set_value("map_lang_combo", self.current_map.lang)
             
     def update_field_properties(self, field: BMSField):
         """Actualiza las propiedades del campo en el panel"""
         # Actualizar título de la sección con el nombre del campo
-        dpg.set_item_label("field_section_header", f"Campo Seleccionado: {field.name}")
+        if dpg.does_item_exist("field_section_header"):
+            dpg.set_item_label("field_section_header", f"Campo Seleccionado: {field.name}")
         
-        dpg.set_value("field_name_input", field.name)
-        dpg.set_value("field_line_input", field.line)
-        dpg.set_value("field_column_input", field.column)
-        dpg.set_value("field_length_input", field.length)
-        dpg.set_value("field_type_combo", field.field_type.value)
-        dpg.set_value("field_initial_input", field.initial_value)
-        dpg.set_value("field_color_combo", field.color or "")
-        dpg.set_value("field_hilight_combo", field.hilight or "")
+        # Verificar que cada elemento existe antes de establecer valores
+        if dpg.does_item_exist("field_name_input"):
+            dpg.set_value("field_name_input", field.name)
+        if dpg.does_item_exist("field_line_input"):
+            dpg.set_value("field_line_input", field.line)
+        if dpg.does_item_exist("field_column_input"):
+            dpg.set_value("field_column_input", field.column)
+        if dpg.does_item_exist("field_length_input"):
+            dpg.set_value("field_length_input", field.length)
+        if dpg.does_item_exist("field_type_combo"):
+            dpg.set_value("field_type_combo", field.field_type.value)
+        if dpg.does_item_exist("field_initial_input"):
+            dpg.set_value("field_initial_input", field.initial_value)
+        if dpg.does_item_exist("field_color_combo"):
+            dpg.set_value("field_color_combo", field.color or "")
+        if dpg.does_item_exist("field_hilight_combo"):
+            dpg.set_value("field_hilight_combo", field.hilight or "")
         
         # Actualizar checkboxes de atributos
         for attr in FieldAttribute:
-            dpg.set_value(f"attr_{attr.value}", attr in field.attributes)
+            attr_id = f"attr_{attr.value}"
+            if dpg.does_item_exist(attr_id):
+                dpg.set_value(attr_id, attr in field.attributes)
             
     def update_visual_editor(self):
         """Actualiza el editor visual con los campos del mapa actual"""
+        # Verificar que el canvas existe
+        if not dpg.does_item_exist("map_canvas"):
+            return
+            
         # Limpiar canvas
         dpg.delete_item("map_canvas", children_only=True)
         
@@ -1310,6 +1356,10 @@ class BMSGeneratorApp:
         
     def update_bms_code_display(self):
         """Actualiza la visualización del código BMS generado"""
+        # Verificar que el elemento existe antes de establecer el valor
+        if not dpg.does_item_exist("bms_code_text"):
+            return
+            
         if self.current_map:
             try:
                 # Generar código BMS usando el generador
@@ -1327,7 +1377,10 @@ class BMSGeneratorApp:
         self.selected_field = None
         self.selected_field_index = -1
         self.is_dragging = False
-        dpg.set_value("current_field_label", "Campo actual: Ninguno")
+        
+        # Verificar que el elemento existe antes de establecer el valor
+        if dpg.does_item_exist("current_field_label"):
+            dpg.set_value("current_field_label", "Campo actual: Ninguno")
         
         # Resetear título de la sección
         dpg.set_item_label("field_section_header", "Campo Seleccionado: Ninguno")

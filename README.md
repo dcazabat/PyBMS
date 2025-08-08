@@ -2,7 +2,17 @@
 
 Una herramienta completa para generar mapas BMS (Basic Mapping Support) para sistemas mainframe CICS, desarrollada en Python usando DearPyGUI.
 
-## 🚀 Características6. **Guardar**: Exportar proyecto para uso posterior
+## 🚀 Preview
+
+### Interfaz Principal
+![Pantalla Principal de PyBMS](pictures/pic01.png)
+
+*Vista general de la interfaz de PyBMS mostrando el editor visual con grid 24x80, panel de propiedades y explorador de proyecto.*
+
+### Editor de Campos BMS
+![Editor de Campos y Código BMS](pictures/pic02.png)
+
+*Editor de propiedades de campos BMS con vista previa del código generado automáticamente.*
 
 ## 💻 Desarrollo
 
