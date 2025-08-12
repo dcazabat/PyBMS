@@ -1,7 +1,6 @@
 """
-Generador de código BMS
+Generador de código BMS desde modelos
 """
-
 from typing import List, Optional
 import sys
 import os
@@ -24,20 +23,9 @@ class BMSGenerator:
     def _load_templates(self) -> dict:
         """Carga plantillas de código BMS"""
         return {
-            "mapset_header": """
-{mapset_name} DFHMSD TYPE=&SYSPARM,MODE={mode},LANG={lang},
-           TERM={term},CTRL=({ctrl}),STORAGE={storage}
-""",
-            "map_header": """
-{map_name} DFHMDI SIZE=({lines},{cols})
-""",
-            "field_template": """
-         {name} DFHMDF POS=({line},{col}),LENGTH={length}{attributes}{initial}{picture}
-""",
-            "mapset_footer": """
-         DFHMSD TYPE=FINAL
-         END
-"""
+            "mapset_header": "{mapset_name:<8} DFHMSD TYPE=&SYSPARM,MODE={mode},LANG={lang},          *\n               TERM={term},CTRL=({ctrl}),STORAGE={storage}",
+            "map_header": "{map_name:<8} DFHMDI SIZE=({lines},{cols})",
+            "mapset_footer": "         DFHMSD TYPE=FINAL\n         END"
         }
         
     def generate_map_code(self, bms_map: BMSMap) -> str:
@@ -153,24 +141,24 @@ class BMSGenerator:
                 continuation_parts.append(hilight_str.lstrip(','))
                 
             if field_name:
-                # Campo con nombre real y continuación
-                field_line = f"{field_name:8} {main_parts}"
+                # Campo con nombre real y continuación - alinear DFHMDF en columna 10
+                field_line = f"{field_name:<8} {main_parts}"
                 if continuation_parts:
-                    field_line += ",          *\n"
-                    field_line += f"               {','.join(continuation_parts)}"
+                    field_line += ",          *"
+                    field_line += f"\n               {','.join(continuation_parts)}"
             else:
-                # Campo sin nombre y continuación
+                # Campo sin nombre y continuación - DFHMDF en columna 10
                 field_line = f"         {main_parts}"
                 if continuation_parts:
-                    field_line += ",          *\n"
-                    field_line += f"               {','.join(continuation_parts)}"
+                    field_line += ",          *"
+                    field_line += f"\n               {','.join(continuation_parts)}"
         else:
             # Línea simple
             if field_name:
-                # Campo con nombre real
-                field_line = f"{field_name:8} {base_line}"
+                # Campo con nombre real - alinear DFHMDF en columna 10
+                field_line = f"{field_name:<8} {base_line}"
             else:
-                # Campo sin nombre (usar espacios para alineación)
+                # Campo sin nombre - DFHMDF en columna 10
                 field_line = f"         {base_line}"
             
         return field_line

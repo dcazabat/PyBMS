@@ -2,4 +2,4 @@
 GUI components init
 """
 
-from .main_window import BMSGeneratorApp
+from .main_window.app import BMSGeneratorApp
