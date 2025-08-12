@@ -13,6 +13,9 @@ def new_project(app):
     app.current_map = None  # Limpiar mapa actual también
     app.current_file_path = None  # Limpiar archivo actual
     app.update_project_tree()
+    app.update_map_properties()
+    app.update_visual_editor()
+    app.update_bms_code_display()
     app.update_status("Nuevo proyecto creado")
 
 def new_map(app):
@@ -517,6 +520,91 @@ def _confirm_apply_changes(app):
     """Confirma y aplica los cambios al campo"""
     dpg.delete_item("confirm_changes_modal")
     apply_field_changes(app)
+
+def generate_bms_with_confirmation(app):
+    """Genera el código BMS con confirmación previa"""
+    if not app.current_map:
+        app.update_status("No hay mapa seleccionado para generar BMS")
+        return
+    
+    # Crear modal de confirmación
+    if dpg.does_item_exist("confirm_generate_modal"):
+        dpg.delete_item("confirm_generate_modal")
+        
+    with dpg.window(
+        label="Confirmar Generación de BMS",
+        modal=True,
+        show=True,
+        tag="confirm_generate_modal",
+        width=500,
+        height=220,
+        pos=[400, 300]
+    ):
+        dpg.add_text(f"¿Qué desea hacer con el código BMS del mapa '{app.current_map.name}'?")
+        dpg.add_text("Esta acción aplicará todos los cambios pendientes.")
+        dpg.add_separator()
+        
+        with dpg.group(horizontal=True):
+            # Botón solo generar - verde claro
+            with dpg.theme() as generate_only_theme:
+                with dpg.theme_component(dpg.mvButton):
+                    dpg.add_theme_color(dpg.mvThemeCol_Button, (40, 167, 69, 255))
+                    dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (50, 205, 50, 255))
+                    dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (30, 130, 50, 255))
+            dpg.add_button(
+                label="[👁] Solo Mostrar", 
+                callback=lambda: _confirm_generate_only(app),
+                width=120
+            )
+            dpg.bind_item_theme(dpg.last_item(), generate_only_theme)
+            
+            # Botón generar y guardar - azul
+            with dpg.theme() as generate_save_theme:
+                with dpg.theme_component(dpg.mvButton):
+                    dpg.add_theme_color(dpg.mvThemeCol_Button, (0, 123, 255, 255))
+                    dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (0, 140, 255, 255))
+                    dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (0, 100, 200, 255))
+            dpg.add_button(
+                label="[💾] Mostrar y Guardar", 
+                callback=lambda: _confirm_generate_and_save(app),
+                width=140
+            )
+            dpg.bind_item_theme(dpg.last_item(), generate_save_theme)
+            
+            # Botón cancelar - rojo
+            with dpg.theme() as modal_cancel_theme:
+                with dpg.theme_component(dpg.mvButton):
+                    dpg.add_theme_color(dpg.mvThemeCol_Button, (220, 53, 69, 255))
+                    dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (255, 69, 0, 255))
+                    dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (178, 34, 34, 255))
+            dpg.add_button(
+                label="[X] Cancelar", 
+                callback=lambda: dpg.delete_item("confirm_generate_modal"),
+                width=100
+            )
+            dpg.bind_item_theme(dpg.last_item(), modal_cancel_theme)
+
+def _confirm_generate_only(app):
+    """Confirma y genera el código BMS solo para mostrar"""
+    dpg.delete_item("confirm_generate_modal")
+    # Aplicar cambios pendientes si hay campo seleccionado
+    if app.selected_field:
+        apply_field_changes(app)
+    # Generar y mostrar código BMS
+    app.update_bms_code_display()
+    app.update_status("Código BMS generado y mostrado")
+
+def _confirm_generate_and_save(app):
+    """Confirma, genera el código BMS y abre guardar como"""
+    dpg.delete_item("confirm_generate_modal")
+    # Aplicar cambios pendientes si hay campo seleccionado
+    if app.selected_field:
+        apply_field_changes(app)
+    # Generar y mostrar código BMS
+    app.update_bms_code_display()
+    # Abrir diálogo para guardar
+    app.save_bms_as()
+    app.update_status("Código BMS generado - Guardar archivo")
 
 def export_to_json(app):
     """Exporta el proyecto actual a un archivo JSON"""

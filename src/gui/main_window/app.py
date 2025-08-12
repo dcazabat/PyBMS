@@ -152,6 +152,10 @@ class BMSGeneratorApp:
         from .callbacks import new_field
         new_field(self)
         
+    def generate_bms_with_confirmation(self):
+        from .callbacks import generate_bms_with_confirmation
+        generate_bms_with_confirmation(self)
+        
     def export_to_json(self):
         from .callbacks import export_to_json
         export_to_json(self)

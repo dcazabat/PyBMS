@@ -80,7 +80,7 @@ def create_main_window(app):
                     dpg.add_theme_color(dpg.mvThemeCol_Button, (70, 130, 180, 255))
                     dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (100, 149, 237, 255))
                     dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (30, 90, 140, 255))
-            dpg.add_button(label="[+] Nuevo", callback=app.new_project)
+            dpg.add_button(label="[+] Nuevo Proyecto", callback=app.new_project)
             dpg.bind_item_theme(dpg.last_item(), nuevo_theme)
             
             with dpg.theme() as abrir_theme:
@@ -90,25 +90,6 @@ def create_main_window(app):
                     dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (30, 90, 140, 255))
             dpg.add_button(label="[O] Abrir", callback=app.open_project)
             dpg.bind_item_theme(dpg.last_item(), abrir_theme)
-            
-            with dpg.theme() as guardar_theme:
-                with dpg.theme_component(dpg.mvButton):
-                    dpg.add_theme_color(dpg.mvThemeCol_Button, (34, 139, 34, 255))
-                    dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (50, 205, 50, 255))
-                    dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (20, 100, 20, 255))
-            dpg.add_button(label="[S] Guardar", callback=app.save_bms)
-            dpg.bind_item_theme(dpg.last_item(), guardar_theme)
-            
-            dpg.add_separator()
-            
-            # Botón aplicar cambios - naranja
-            with dpg.theme() as aplicar_theme:
-                with dpg.theme_component(dpg.mvButton):
-                    dpg.add_theme_color(dpg.mvThemeCol_Button, (255, 140, 0, 255))
-                    dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (255, 165, 0, 255))
-                    dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (205, 110, 0, 255))
-            dpg.add_button(label="[*] Aplicar Cambios", callback=app.apply_field_changes_with_confirmation)
-            dpg.bind_item_theme(dpg.last_item(), aplicar_theme)
             
             dpg.add_separator()
             
@@ -137,7 +118,7 @@ def create_main_window(app):
                     dpg.add_theme_color(dpg.mvThemeCol_Button, (220, 20, 60, 255))
                     dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (255, 69, 0, 255))
                     dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (178, 34, 34, 255))
-            dpg.add_button(label="[G] Generar BMS", callback=lambda: app.update_bms_code_display())
+            dpg.add_button(label="[G] Generar BMS", callback=app.generate_bms_with_confirmation)
             dpg.bind_item_theme(dpg.last_item(), generar_theme)
         
         dpg.add_separator()
@@ -263,53 +244,6 @@ def create_properties_panel(app):
                     dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (20, 100, 20, 255))
             dpg.add_button(label="[*] Aplicar Cambios", callback=app.apply_field_changes, width=140)
             dpg.bind_item_theme(dpg.last_item(), prop_aplicar_theme)
-            
-            # Botón seleccionar - azul claro
-            with dpg.theme() as prop_select_theme:
-                with dpg.theme_component(dpg.mvButton):
-                    dpg.add_theme_color(dpg.mvThemeCol_Button, (30, 144, 255, 255))
-                    dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (70, 170, 255, 255))
-                    dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (10, 120, 200, 255))
-            dpg.add_button(label="[>] Seleccionar Campo", callback=lambda: show_field_selector(app), width=140)
-            dpg.bind_item_theme(dpg.last_item(), prop_select_theme)
-
-def show_field_selector(app):
-    """Muestra un diálogo para seleccionar un campo"""
-    if not app.current_map or not app.current_map.fields:
-        app.update_status("No hay campos disponibles para seleccionar")
-        return
-        
-    # Crear ventana de selección
-    with dpg.window(label="Seleccionar Campo", width=300, height=400, modal=True, tag="field_selector_window"):
-        dpg.add_text("Seleccione un campo:")
-        dpg.add_separator()
-        
-        # Lista de campos
-        for i, field in enumerate(app.current_map.fields):
-            # Crear callback específico para cada botón
-            callback_func = lambda sender, app_data, i=i: select_field_by_index(app, i)
-            # Botones de campos - azul claro
-            with dpg.theme() as field_select_theme:
-                with dpg.theme_component(dpg.mvButton):
-                    dpg.add_theme_color(dpg.mvThemeCol_Button, (72, 139, 194, 255))
-                    dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (100, 149, 237, 255))
-                    dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (50, 100, 150, 255))
-            dpg.add_button(
-                label=f"[F] {field.name} (L{field.line}:C{field.column})",
-                callback=callback_func,
-                width=-1
-            )
-            dpg.bind_item_theme(dpg.last_item(), field_select_theme)
-            
-        dpg.add_separator()
-        # Botón cancelar - rojo
-        with dpg.theme() as selector_cancel_theme:
-            with dpg.theme_component(dpg.mvButton):
-                dpg.add_theme_color(dpg.mvThemeCol_Button, (220, 53, 69, 255))
-                dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (255, 69, 0, 255))
-                dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (178, 34, 34, 255))
-        dpg.add_button(label="[X] Cancelar", callback=lambda: dpg.delete_item("field_selector_window"), width=-1)
-        dpg.bind_item_theme(dpg.last_item(), selector_cancel_theme)
 
 def update_field_properties(app, field):
     """Actualiza las propiedades del campo en el panel"""
@@ -344,38 +278,6 @@ def update_field_properties(app, field):
         attr_id = f"attr_{attr.value}"
         if dpg.does_item_exist(attr_id):
             dpg.set_value(attr_id, attr in field.attributes)
-
-def select_field_by_index(app, index):
-    """Selecciona un campo por su índice"""
-    # Verificar que el índice es válido
-    if index is None:
-        app.update_status("Error: índice de campo inválido")
-        return
-        
-    if app.current_map and 0 <= index < len(app.current_map.fields):
-        field = app.current_map.fields[index]
-        
-        # Deseleccionar el campo anterior si existe
-        if app.selected_field and app.selected_field.name in app.field_selectables:
-            dpg.set_value(app.field_selectables[app.selected_field.name], False)
-        
-        # Seleccionar el nuevo campo
-        app.selected_field = field
-        app.selected_field_index = index
-        
-        # Actualizar el árbol del proyecto
-        if field.name in app.field_selectables:
-            dpg.set_value(app.field_selectables[field.name], True)
-        
-        update_field_properties(app, app.selected_field)
-        app.update_visual_editor()
-        app.update_status(f"Campo seleccionado: {app.selected_field.name}")
-        
-        # Cerrar ventana de selección
-        if dpg.does_item_exist("field_selector_window"):
-            dpg.delete_item("field_selector_window")
-    else:
-        app.update_status(f"Error: índice de campo fuera de rango: {index}")
 
 def draw_screen_grid(app):
     """Dibuja la cuadrícula de la pantalla 24x80"""
@@ -564,9 +466,13 @@ def update_project_tree(app):
                 for bms_map in app.current_project.maps:
                     with dpg.tree_node(label=f"📄 {bms_map.name}", leaf=True):
                         for field in bms_map.fields:
+                            # Crear callback con captura correcta del nombre del campo
+                            def make_callback(field_name):
+                                return lambda sender, app_data: select_field(app, field_name) if app_data else None
+                            
                             selectable_id = dpg.add_selectable(
                                 label=f"🔢 {field.name}",
-                                callback=lambda sender, app_data, field=field: select_field(app, field.name) if app_data else None,
+                                callback=make_callback(field.name),
                                 default_value=False
                             )
                             # Guardar referencia para poder deseleccionar después

@@ -78,90 +78,105 @@ class BMSGenerator:
             return ""
             
         # Determinar si el nombre es automático (generado por la aplicación)
-        is_auto_generated_name = (
-            field.name.startswith("FIELD_") and 
-            "_" in field.name and 
-            all(part.isdigit() for part in field.name.split("_")[1:])
-        )
+        is_auto_generated_name = self._is_auto_generated_name(field.name)
         
         # Usar nombre solo si no es generado automáticamente
         field_name = "" if is_auto_generated_name else field.name
         
-        # Construir atributos
-        attributes_str = ""
-        if field.attributes:
-            attrs = [attr.value for attr in field.attributes]
-            attributes_str = f",ATTRB=({','.join(attrs)})"
-            
-        # Valor inicial
-        initial_str = ""
-        if field.initial_value:
-            # Escapar comillas simples
-            escaped_value = field.initial_value.replace("'", "''")
-            initial_str = f",INITIAL='{escaped_value}'"
-            
-        # Picture (PICIN y PICOUT)
-        picture_str = ""
-        if field.picin:
-            picture_str += f",PICIN='{field.picin}'"
-        if field.picout:
-            picture_str += f",PICOUT='{field.picout}'"
-            
-        # Color
-        color_str = ""
-        if field.color:
-            color_str = f",COLOR={field.color}"
-            
-        # Hilight
-        hilight_str = ""
-        if field.hilight:
-            hilight_str = f",HILIGHT={field.hilight}"
-            
-        # Determinar si necesitamos línea de continuación
-        base_line = f"DFHMDF POS=({field.line},{field.column}),LENGTH={field.length}{attributes_str}{initial_str}{picture_str}{color_str}{hilight_str}"
+        # Construir la línea completa del campo
+        return self._build_field_line(field_name, field)
         
-        # Si la línea es muy larga (>72 caracteres), usar continuación
-        if len(base_line) > 65:  # Dejar espacio para nombre y continuación
-            # Línea principal
-            main_parts = f"DFHMDF POS=({field.line},{field.column}),LENGTH={field.length}"
-            if field.initial_value:
-                main_parts += initial_str
+    def _build_field_line(self, field_name: str, field: BMSField) -> str:
+        """Construye la línea BMS para un campo, manejando continuaciones"""
+        
+        # Construir parámetros base
+        pos_param = f"POS=({field.line},{field.column})"
+        length_param = f"LENGTH={field.length}"
+        
+        # Construir parámetros adicionales
+        params = []
+        
+        # INITIAL siempre va primero después de LENGTH
+        if field.initial_value:
+            escaped_value = field.initial_value.replace("'", "''")
+            params.append(f"INITIAL='{escaped_value}'")
             
-            # Línea de continuación
-            continuation_parts = []
-            if field.attributes:
-                continuation_parts.append(attributes_str.lstrip(','))
-            if field.picin:
-                continuation_parts.append(f"PICIN='{field.picin}'")
-            if field.picout:
-                continuation_parts.append(f"PICOUT='{field.picout}'")
-            if field.color:
-                continuation_parts.append(color_str.lstrip(','))
-            if field.hilight:
-                continuation_parts.append(hilight_str.lstrip(','))
+        # ATTRB
+        if field.attributes:
+            attrs = []
+            for attr in field.attributes:
+                if hasattr(attr, 'value'):
+                    attrs.append(attr.value)
+                else:
+                    attrs.append(str(attr))
+            if attrs:
+                params.append(f"ATTRB=({','.join(attrs)})")
                 
-            if field_name:
-                # Campo con nombre real y continuación - alinear DFHMDF en columna 10
-                field_line = f"{field_name:<8} {main_parts}"
-                if continuation_parts:
-                    field_line += ",          *"
-                    field_line += f"\n               {','.join(continuation_parts)}"
-            else:
-                # Campo sin nombre y continuación - DFHMDF en columna 10
-                field_line = f"         {main_parts}"
-                if continuation_parts:
-                    field_line += ",          *"
-                    field_line += f"\n               {','.join(continuation_parts)}"
-        else:
-            # Línea simple
-            if field_name:
-                # Campo con nombre real - alinear DFHMDF en columna 10
-                field_line = f"{field_name:<8} {base_line}"
-            else:
-                # Campo sin nombre - DFHMDF en columna 10
-                field_line = f"         {base_line}"
+        # PICIN y PICOUT
+        if field.picin:
+            params.append(f"PICIN='{field.picin}'")
+        if field.picout:
+            params.append(f"PICOUT='{field.picout}'")
             
-        return field_line
+        # COLOR
+        if field.color:
+            params.append(f"COLOR={field.color}")
+            
+        # HILIGHT
+        if field.hilight:
+            params.append(f"HILIGHT={field.hilight}")
+        
+        # Construir línea base
+        base_params = f"{pos_param},{length_param}"
+        if params:
+            all_params = base_params + "," + ",".join(params)
+        else:
+            all_params = base_params
+            
+        # Determinar formato según nombre y longitud
+        if field_name:
+            # Campo con nombre: "NOMBRE   DFHMDF ..."
+            prefix = f"{field_name:<8} DFHMDF "
+        else:
+            # Campo sin nombre: "         DFHMDF ..."
+            prefix = "         DFHMDF "
+            
+        full_line = prefix + all_params
+        
+        # Verificar si necesita continuación (línea > 71 caracteres)
+        if len(full_line) > 71:
+            # Necesita continuación - dividir los parámetros
+            return self._build_continuation_line(prefix, base_params, params)
+        else:
+            return full_line
+            
+    def _build_continuation_line(self, prefix: str, base_params: str, additional_params: list) -> str:
+        """Construye una línea con continuación BMS"""
+        
+        # Primera línea: DFHMDF + parámetros básicos + primer parámetro adicional si cabe
+        first_line = prefix + base_params
+        
+        remaining_params = additional_params[:]
+        
+        # Intentar agregar parámetros a la primera línea hasta llegar al límite
+        while remaining_params:
+            next_param = remaining_params[0]
+            test_line = first_line + "," + next_param
+            
+            # Dejar espacio para ",          *" (12 caracteres)
+            if len(test_line) + 12 <= 71:
+                first_line = test_line
+                remaining_params.pop(0)
+            else:
+                break
+        
+        # Si quedan parámetros, crear línea de continuación
+        if remaining_params:
+            first_line += ",          *"
+            continuation_line = f"               {','.join(remaining_params)}"
+            return first_line + "\n" + continuation_line
+        else:
+            return first_line
         
     def validate_map(self, bms_map: BMSMap) -> List[str]:
         """Valida un mapa BMS y retorna lista de errores"""
@@ -233,3 +248,36 @@ class BMSGenerator:
         if not name or len(name) > 8:
             return False
         return re.match(r'^[A-Za-z][A-Za-z0-9]*$', name) is not None
+
+    def _is_auto_generated_name(self, name: str) -> bool:
+        """Determina si un nombre de campo es generado automáticamente por la aplicación"""
+        if not name:
+            return True
+            
+        # Patrones de nombres automáticos generados por la aplicación:
+        
+        # 1. FIELD01, FIELD02, etc. (del parser estructurado)
+        if re.match(r'^FIELD\d{2}$', name):
+            return True
+            
+        # 2. CAMPO01, CAMPO02, etc. (de nuevo campo manual)
+        if re.match(r'^CAMPO\d{2}$', name):
+            return True
+            
+        # 3. FIELD_línea_columna (de parsing legacy sin nombre)
+        if re.match(r'^FIELD_\d+_\d+$', name):
+            return True
+            
+        # 4. Nombres genéricos
+        if name in ['UNNAMED', 'UNNAMED_FIELD', 'FIELD', 'CAMPO']:
+            return True
+            
+        # 5. Nombres que empiecen con prefijos específicos de generación automática
+        # Solo consideramos patrones específicos, no cualquier cosa que empiece con estos prefijos
+        if re.match(r'^AUTO_[A-Z0-9_]+$', name):
+            return True
+            
+        if re.match(r'^GEN_[A-Z0-9_]+$', name):
+            return True
+            
+        return False
